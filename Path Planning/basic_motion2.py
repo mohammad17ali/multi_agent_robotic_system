@@ -60,22 +60,22 @@ move2.angular.y = 0
 move2.angular.z = 0
 
 
-class BasicController:
-    self.robot_x = None
-    self.robot_y = None
-    self.robot_yaw = None
-    self.target_reached = False
-    self.target_tolerance = 0.1  # Tolerance for considering the target reached
-    self.linear_speed = 0.2  # Linear speed of the robot
-    self.angular_speed = 0.5  # Angular speed of the robot
-    self.target_x = None
-    self.target_y = None
-    self.target_orientation = 0
-
+class BasicController(self):
     global ite
     def __init__(self):       
-       self.bridge = CvBridge()
-       self.rgb_sub = rospy.Subscriber('/realsense/camera/rgb/image_raw', Image, self.IntelSubscriberRGB)
+        self.bridge = CvBridge()
+        self.rgb_sub = rospy.Subscriber('/realsense/camera/rgb/image_raw', Image, self.coords)
+        self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.robot_x = None
+        self.robot_y = None
+        self.robot_yaw = None
+        self.target_reached = False
+        self.target_tolerance = 0.1  # Tolerance for considering the target reached
+        self.linear_speed = 0.2  # Linear speed of the robot
+        self.angular_speed = 0.5  # Angular speed of the robot
+        self.target_x = None
+        self.target_y = None
+        self.target_orientation = 0
 
     def coords(self,msg):
         global ite,flaglist,initial_time,initial_time,move1,move2,move3,ctime_mat1,c_mat1,dist_mat1,ctime_mat2,c_mat2,dist_mat2,RelPosition,poseidin, goallist,Form,FormErrMat,DistErrMat,PI_error1,PI_error2
