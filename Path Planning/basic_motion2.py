@@ -2,6 +2,7 @@
 import rospy
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
+from nav_msgs.msg import Odometry
 import cv2
 import pyrealsense2 as rs
 import numpy as np
@@ -10,6 +11,7 @@ import cv2.aruco as aruco
 import time
 import scipy.io
 from geometry_msgs.msg import Twist
+import math
 
 global s, id_list, Coordinates_list,z_anglist,ite,initial_time,move1,move2,poseid,poseidin,goallist,flaglist,Form,FormErrMat,DistErrMat,PI_error1,PI_error2
 s = 0.6
@@ -60,12 +62,13 @@ move2.angular.y = 0
 move2.angular.z = 0
 
 
-class BasicController(self):
+class BasicController:
     global ite
     def __init__(self):       
         self.bridge = CvBridge()
         self.rgb_sub = rospy.Subscriber('/realsense/camera/rgb/image_raw', Image, self.coords)
         self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.odom_sub = rospy.Subscriber('/odom, Odometry, self.odom_callback)
         self.robot_x = None
         self.robot_y = None
         self.robot_yaw = None
@@ -76,16 +79,19 @@ class BasicController(self):
         self.target_x = None
         self.target_y = None
         self.target_orientation = 0
+        self.start_list = []
+        self.target_list = []
 
     def coords(self,msg):
         global ite,flaglist,initial_time,initial_time,move1,move2,move3,ctime_mat1,c_mat1,dist_mat1,ctime_mat2,c_mat2,dist_mat2,RelPosition,poseidin, goallist,Form,FormErrMat,DistErrMat,PI_error1,PI_error2
+        
         if ite == 0:
             initial_time = time.time()
             time_mat.append(initial_time)   
         try:
             rospy.loginfo(rospy.get_caller_id() + "Recieving RGB data")
             rgb_image = self.bridge.imgmsg_to_cv2(msg,"bgr8")
-        cv2.waitKey(1)
+            cv2.waitKey(1)
         except Exception as e:
             print(e)
 
@@ -169,6 +175,9 @@ class BasicController(self):
                         start_x, start_y = coordinates(calib_coords, start_x_,start_y_, theta)
                         marker_text_start = "P1({:.2f}, {:.2f})".format( start_x, start_y)
                         cv2.putText(color_image, marker_text_start, start_org, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        start = [start_x,start_y]
+                        self.start_list.append(start)
+                        
                 
                 elif ids[i] == 3: #id30 = target point tag
                     rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], 0.05, np.eye(3), None)
@@ -186,14 +195,17 @@ class BasicController(self):
                         target_x, target_y = coordinates(calib_coords, target_x_,target_y_, theta)
                         marker_text_target = "P2({:.2f}, {:.2f})".format( target_x, target_y)
                         cv2.putText(color_image, marker_text_target, target_org, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        target = [target_x,target_y]
+                        self.target_list.append(target)
                 
                 
         cv2.aruco.drawDetectedMarkers(rgb_image, corners)
         cv2.imshow("ArUco Marker Detection", rgb_image)
-        start = [start_x,start_y]
-        target = [target_x,target_y]
+        #start = [start_x,start_y]
         
-        return start,target
+        #coords.append
+        
+        #return start,target
 
 
     
@@ -222,7 +234,8 @@ class BasicController(self):
     ##changed controller
     
     def target(self):
-        _,target = self.coords()
+    
+        _,target = self.target_list[-1]
         
         self.target_x = target[0]
         self.target_y = target[1] 
@@ -279,8 +292,8 @@ class BasicController(self):
         return angle_to_target
 
     def navigate_to_target(self):
-        angle_to_target = self.calculate_angle_to_target(self.target_x, self.target_y)
-        self.rotate_to_orientation(angle_to_target)
+        angle_to_target = self.calculate_angle_to_target()
+        self.rotate_to_orientation()
 
         distance_to_target = math.sqrt((self.target_x - self.robot_x)**2 + (self.target_y - self.robot_y)**2)
         self.move_forward(distance_to_target)
