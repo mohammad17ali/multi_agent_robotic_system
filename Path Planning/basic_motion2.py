@@ -93,115 +93,117 @@ class BasicController:
             rospy.loginfo(rospy.get_caller_id() + "Recieving RGB data")
             rgb_image = self.bridge.imgmsg_to_cv2(msg,"bgr8")
             cv2.waitKey(1)
-        except Exception as e:
-            print(e)
-
-        camera_msg = rospy.wait_for_message('/realsense/camera/rgb/camera_info', CameraInfo)
-        depth_msg = rospy.wait_for_message('/realsense/camera/depth/image_raw', Image)
-        depth_frame = self.bridge.imgmsg_to_cv2(depth_msg,desired_encoding='passthrough')
-
-        camera_matrix = np.array(camera_msg.K).reshape((3,3))
-        dist_coeff = np.array(camera_msg.D)
-        intrinsics = rs.intrinsics()
-        intrinsics.width = 640
-        intrinsics.height = 480
-        intrinsics.fx = camera_matrix[0,0]
-        intrinsics.fy = camera_matrix[1,1]
-        intrinsics.ppx = camera_matrix[0,2]
-        intrinsics.ppy = camera_matrix[1,2]
-
-
-        aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)
-        aruco_params = cv2.aruco.DetectorParameters()
         
-        aruco_detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
-        corners, ids, _ = cv2.aruco.detectMarkers(rgb_image, aruco_dict, parameters=aruco_params)
-
-        calib_coords = [] 
-        if ids is not None:
-            for i in range(len(ids)):
-                if ids[i] == 1:
-                    a_corner = corners[i]
-                    p1 = np.mean(a_corner[0], axis=0).astype(int)
-                    depth_value = depth_frame.get_distance(p1[0], p1[1])
-                    if depth_value > 0:
-                        depth_point = rs.rs2_deproject_pixel_to_point(
-                            depth_frame.profile.as_video_stream_profile().intrinsics, [p1[0], p1[1]], depth_value)
-                        x1__ = depth_point[0]
-                        y1__ = depth_point[1]
-                        z1 = depth_point[2] # no need for separate z1_, as its value won't be changed
-                        org_a = (int(a_corner[0, 0, 0]), int(a_corner[0, 0, 1]) - 10)
-                if ids[i] == 2:
-                    b_corner = corners[i]
-                    p2 = np.mean(b_corner[0], axis=0).astype(int)
-                    depth_value = depth_frame.get_distance(p2[0], p2[1])
-                    if depth_value > 0:
-                        depth_point = rs.rs2_deproject_pixel_to_point(
-                            depth_frame.profile.as_video_stream_profile().intrinsics, [p2[0], p2[1]], depth_value)
-                        x2__ = depth_point[0]
-                        y2__ = depth_point[1]
-                        z2 = depth_point[2] # no need for separate z1_, as its value won't be changed
-                        org_b = (int(b_corner[0, 0, 0]), int(b_corner[0, 0, 1]) - 10) 
-
-                x1_, y1_, x2_,y2_ = round(x1__,2),round(y1__,2), round(x2__,2), round(y2__,2)
-                calib_coords = [x1_, y1_, x2_,y2_]
-                theta = angle(y1_,y2_,x1_,x2_)
-
-                if (1 in ids) and (2 in ids):
-                    x1,y1 = coordinates(calib_coords,x1_,y1_,theta)
-                    x2,y2 = coordinates(calib_coords,x2_,y2_,theta)
-                    marker_text_a = "A({:.2f}, {:.2f})".format( x1, y1)
-                    marker_text_b = "B({:.2f}, {:.2f})".format(x2, y2)
-                    cv2.line(color_image, p1, p2,(255,0,0), 1)
-                    cv2.putText(color_image, marker_text_a, org_a, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                    cv2.putText(color_image, marker_text_b, org_b, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-                else:
-                    break
-
-        if ids is not None:
-            for i in range(len(ids)):
-                if ids[i] == 4: #id16 = starting point tag
-                    rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], 0.05, np.eye(3), None)
-                    center = np.mean(corners[i][0], axis=0).astype(int)
-                    depth_value = depth_frame.get_distance(center[0], center[1])
-                    if depth_value > 0:
-                        depth_point = rs.rs2_deproject_pixel_to_point(
-                            depth_frame.profile.as_video_stream_profile().intrinsics, [center[0], center[1]], depth_value)
-                        start_x_ = depth_point[0]
-                        start_y_ = depth_point[1]
-                        start_z = depth_point[2] # no need for separate z1_, as its value won't be changed
-                        start_org = (int(corners[i][0, 0, 0]), int(corners[i][0, 0, 1]) - 10)
-                        
-                        start_x, start_y = coordinates(calib_coords, start_x_,start_y_, theta)
-                        marker_text_start = "P1({:.2f}, {:.2f})".format( start_x, start_y)
-                        cv2.putText(color_image, marker_text_start, start_org, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        start = [start_x,start_y]
-                        self.start_list.append(start)
-                        
+    
+            camera_msg = rospy.wait_for_message('/realsense/camera/rgb/camera_info', CameraInfo)
+            depth_msg = rospy.wait_for_message('/realsense/camera/depth/image_raw', Image)
+            depth_frame = self.bridge.imgmsg_to_cv2(depth_msg,desired_encoding='passthrough')
+    
+            camera_matrix = np.array(camera_msg.K).reshape((3,3))
+            dist_coeff = np.array(camera_msg.D)
+            intrinsics = rs.intrinsics()
+            intrinsics.width = 640
+            intrinsics.height = 480
+            intrinsics.fx = camera_matrix[0,0]
+            intrinsics.fy = camera_matrix[1,1]
+            intrinsics.ppx = camera_matrix[0,2]
+            intrinsics.ppy = camera_matrix[1,2]
+    
+    
+            aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)
+            aruco_params = cv2.aruco.DetectorParameters()
+            
+            aruco_detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
+            corners, ids, _ = cv2.aruco.detectMarkers(rgb_image, aruco_dict, parameters=aruco_params)
+    
+            calib_coords = [] 
+            if ids is not None:
+                for i in range(len(ids)):
+                    if ids[i] == 1:
+                        a_corner = corners[i]
+                        p1 = np.mean(a_corner[0], axis=0).astype(int)
+                        depth_value = depth_frame.get_distance(p1[0], p1[1])
+                        if depth_value > 0:
+                            depth_point = rs.rs2_deproject_pixel_to_point(
+                                depth_frame.profile.as_video_stream_profile().intrinsics, [p1[0], p1[1]], depth_value)
+                            x1__ = depth_point[0]
+                            y1__ = depth_point[1]
+                            z1 = depth_point[2] # no need for separate z1_, as its value won't be changed
+                            org_a = (int(a_corner[0, 0, 0]), int(a_corner[0, 0, 1]) - 10)
+                    if ids[i] == 2:
+                        b_corner = corners[i]
+                        p2 = np.mean(b_corner[0], axis=0).astype(int)
+                        depth_value = depth_frame.get_distance(p2[0], p2[1])
+                        if depth_value > 0:
+                            depth_point = rs.rs2_deproject_pixel_to_point(
+                                depth_frame.profile.as_video_stream_profile().intrinsics, [p2[0], p2[1]], depth_value)
+                            x2__ = depth_point[0]
+                            y2__ = depth_point[1]
+                            z2 = depth_point[2] # no need for separate z1_, as its value won't be changed
+                            org_b = (int(b_corner[0, 0, 0]), int(b_corner[0, 0, 1]) - 10) 
+    
+                    x1_, y1_, x2_,y2_ = round(x1__,2),round(y1__,2), round(x2__,2), round(y2__,2)
+                    calib_coords = [x1_, y1_, x2_,y2_]
+                    theta = angle(y1_,y2_,x1_,x2_)
+    
+                    if (1 in ids) and (2 in ids):
+                        x1,y1 = coordinates(calib_coords,x1_,y1_,theta)
+                        x2,y2 = coordinates(calib_coords,x2_,y2_,theta)
+                        marker_text_a = "A({:.2f}, {:.2f})".format( x1, y1)
+                        marker_text_b = "B({:.2f}, {:.2f})".format(x2, y2)
+                        cv2.line(color_image, p1, p2,(255,0,0), 1)
+                        cv2.putText(color_image, marker_text_a, org_a, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        cv2.putText(color_image, marker_text_b, org_b, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    
+                    else:
+                        break
+    
+            if ids is not None:
+                for i in range(len(ids)):
+                    if ids[i] == 4: #id16 = starting point tag
+                        rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], 0.05, np.eye(3), None)
+                        center = np.mean(corners[i][0], axis=0).astype(int)
+                        depth_value = depth_frame.get_distance(center[0], center[1])
+                        if depth_value > 0:
+                            depth_point = rs.rs2_deproject_pixel_to_point(
+                                depth_frame.profile.as_video_stream_profile().intrinsics, [center[0], center[1]], depth_value)
+                            start_x_ = depth_point[0]
+                            start_y_ = depth_point[1]
+                            start_z = depth_point[2] # no need for separate z1_, as its value won't be changed
+                            start_org = (int(corners[i][0, 0, 0]), int(corners[i][0, 0, 1]) - 10)
+                            
+                            start_x, start_y = coordinates(calib_coords, start_x_,start_y_, theta)
+                            marker_text_start = "P1({:.2f}, {:.2f})".format( start_x, start_y)
+                            cv2.putText(color_image, marker_text_start, start_org, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                            start = [start_x,start_y]
+                            self.start_list.append(start)
+                            
+                    
+                    elif ids[i] == 3: #id30 = target point tag
+                        rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], 0.05, np.eye(3), None)
+                        center = np.mean(corners[i][0], axis=0).astype(int)
+                        depth_value = depth_frame.get_distance(center[0], center[1])
+    
+                        if depth_value > 0:
+                            depth_point = rs.rs2_deproject_pixel_to_point(
+                                depth_frame.profile.as_video_stream_profile().intrinsics, [center[0], center[1]], depth_value)
+                            target_x_ = depth_point[0]
+                            target_y_ = depth_point[1]
+                            target_x = depth_point[2] # no need for separate z1_, as its value won't be changed
+                            target_org = (int(corners[i][0, 0, 0]), int(corners[i][0, 0, 1]) - 10)
+                            
+                            target_x, target_y = coordinates(calib_coords, target_x_,target_y_, theta)
+                            marker_text_target = "P2({:.2f}, {:.2f})".format( target_x, target_y)
+                            cv2.putText(color_image, marker_text_target, target_org, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                            target = [target_x,target_y]
+                            self.target_list.append(target)
+                    
                 
-                elif ids[i] == 3: #id30 = target point tag
-                    rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], 0.05, np.eye(3), None)
-                    center = np.mean(corners[i][0], axis=0).astype(int)
-                    depth_value = depth_frame.get_distance(center[0], center[1])
-
-                    if depth_value > 0:
-                        depth_point = rs.rs2_deproject_pixel_to_point(
-                            depth_frame.profile.as_video_stream_profile().intrinsics, [center[0], center[1]], depth_value)
-                        target_x_ = depth_point[0]
-                        target_y_ = depth_point[1]
-                        target_x = depth_point[2] # no need for separate z1_, as its value won't be changed
-                        target_org = (int(corners[i][0, 0, 0]), int(corners[i][0, 0, 1]) - 10)
-                        
-                        target_x, target_y = coordinates(calib_coords, target_x_,target_y_, theta)
-                        marker_text_target = "P2({:.2f}, {:.2f})".format( target_x, target_y)
-                        cv2.putText(color_image, marker_text_target, target_org, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        target = [target_x,target_y]
-                        self.target_list.append(target)
-                
-                
-        cv2.aruco.drawDetectedMarkers(rgb_image, corners)
-        cv2.imshow("ArUco Marker Detection", rgb_image)
+            cv2.aruco.drawDetectedMarkers(rgb_image, corners)
+            cv2.imshow("Camera Feed with ArUco Tags", rgb_image)
+                cv2.waitKey(1)
+        except Exception as e:
+                print(e)
         #start = [start_x,start_y]
         
         #coords.append
