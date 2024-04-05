@@ -11,6 +11,7 @@ import cv2.aruco as aruco
 import time
 import scipy.io
 from geometry_msgs.msg import Twist
+from tf.transformations import euler_from_quaternion
 import math
 
 global s, id_list, Coordinates_list,z_anglist,ite,initial_time,move1,move2,poseid,poseidin,goallist,flaglist,Form,FormErrMat,DistErrMat,PI_error1,PI_error2
@@ -68,7 +69,7 @@ class BasicController:
         self.bridge = CvBridge()
         self.rgb_sub = rospy.Subscriber('/realsense/camera/rgb/image_raw', Image, self.coords)
         self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-        self.odom_sub = rospy.Subscriber('/odom, Odometry, self.odom_callback)
+        self.odom_sub = rospy.Subscriber('/odom', Odometry, self.odom_callback)
         self.robot_x = None
         self.robot_y = None
         self.robot_yaw = None
@@ -97,7 +98,7 @@ class BasicController:
 
         camera_msg = rospy.wait_for_message('/realsense/camera/rgb/camera_info', CameraInfo)
         depth_msg = rospy.wait_for_message('/realsense/camera/depth/image_raw', Image)
-        depth_image = self.bridge.imgmsg_to_cv2(depth_msg,desired_encoding='passthrough')
+        depth_frame = self.bridge.imgmsg_to_cv2(depth_msg,desired_encoding='passthrough')
 
         camera_matrix = np.array(camera_msg.K).reshape((3,3))
         dist_coeff = np.array(camera_msg.D)
@@ -234,11 +235,12 @@ class BasicController:
     ##changed controller
     
     def target(self):
-    
-        _,target = self.target_list[-1]
-        
-        self.target_x = target[0]
-        self.target_y = target[1] 
+        if self.target_list:
+            target = self.target_list[-1]
+            self.target_x = target[0]
+            self.target_y = target[1]
+        else:
+            rospy.logwarn("No target detected yet.")
     
     def odom_callback(self, data):
         # Extract robot's position and orientation from odometry data
@@ -265,28 +267,33 @@ class BasicController:
         self.cmd_vel_pub.publish(twist_msg)
     
     def rotate_to_orientation(self):
-        self.target_orientation = math.atan2(self.target_y - self.robot_y, self.target_x - self.robot_x)
+        ##
         twist_msg = Twist()
         angular_tolerance = 0.05  # Tolerance for considering the target orientation reached
-
+    
         while not rospy.is_shutdown():
-            angle_difference = self.target_orientation - self.robot_yaw
-
-            if abs(angle_difference) < angular_tolerance:
-                break  # Target orientation reached
-
+            angle_to_target = self.calculate_angle_to_target()
+            angle_difference = angle_to_target - self.robot_yaw
+    
+            # Ensure the angle difference is within the range of -pi to pi
             if angle_difference > math.pi:
                 angle_difference -= 2 * math.pi
             elif angle_difference < -math.pi:
                 angle_difference += 2 * math.pi
-
+    
+            # Check if the absolute angle difference is within the tolerance
+            if abs(angle_difference) < angular_tolerance:
+                break  # Target orientation reached
+    
+            # Set the angular speed based on the sign of the angle difference
             twist_msg.angular.z = self.angular_speed if angle_difference > 0 else -self.angular_speed
             self.cmd_vel_pub.publish(twist_msg)
             rospy.sleep(0.1)  # Wait for a short duration
 
-        twist_msg.angular.z = 0  # Stop rotating
+        # Stop rotating
+        twist_msg.angular.z = 0
         self.cmd_vel_pub.publish(twist_msg)
-    
+        ##
     def calculate_angle_to_target(self):
         angle_to_target = math.atan2(self.target_y - self.robot_y, self.target_x - self.robot_x)
         return angle_to_target
@@ -301,19 +308,51 @@ class BasicController:
         # Check if the target is reached
         if distance_to_target < self.target_tolerance:
             self.target_reached = True
-  
+
+    def display_camera_feed(self):
+        rate = rospy.Rate(10)  # Rate at which to display the camera feed (adjust as needed)
+        while not rospy.is_shutdown():
+            try:
+                rospy.loginfo(rospy.get_caller_id() + "Receiving RGB data")
+                rgb_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+                cv2.waitKey(1)
+    
+                # Perform ArUco tag detection
+                corners, ids, _ = cv2.aruco.detectMarkers(rgb_image, aruco_dict, parameters=aruco_params)
+    
+                if ids is not None:
+                    # Draw detected markers on the image
+                    cv2.aruco.drawDetectedMarkers(rgb_image, corners, ids)
+    
+                # Display the image with ArUco tags
+                cv2.imshow("Camera Feed with ArUco Tags", rgb_image)
+                cv2.waitKey(1)
+    
+            except Exception as e:
+                rospy.logerr("Error displaying camera feed: {}".format(e))
+    
+            rate.sleep()
+    
+        cv2.destroyAllWindows()
+      
 
 
 
 
 if __name__ == '__main__':
     try:
-        rospy.init_node('basic_controller_node', anonymous=True)
+        rospy.init_node('camera_display_node', anonymous=True)
         controller = BasicController()
-        controller.navigate_to_target()
-        if controller.target_reached:
-            rospy.loginfo("Target reached!")
-        else:
-            rospy.loginfo("Failed to reach the target.")
+
+        # Start a new thread for the BasicController
+        controller_thread = threading.Thread(target=controller.run)
+        controller_thread.start()
+
+        # Start a new thread to display the camera feed
+        camera_display_thread = threading.Thread(target=display_camera_feed)
+        camera_display_thread.start()
+
+        rospy.spin()  # Keep the main thread alive
+
     except rospy.ROSInterruptException:
         pass
