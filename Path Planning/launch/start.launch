@@ -1,5 +1,6 @@
 <launch>
-  <node pkg = "vh_183378_miniprj" type = "follow_wall.py" name = "wall_follower" />
-  <node pkg = "vh_183378_miniprj" type = "go_to_point.py" name = "go_to_point" />
-  <node pkg = "vh_183378_miniprj" type = "bug_2.py" name = "bug2" output = "screen" />
+    <node pkg="turtlebot3" type="basic_conntroller.py" name="controller" output="screen"/>
+    <node pkg="turtlebot3" type="go_to_point.py" name="go_to_point"/>
+    <node pkg="turtlebot3" type="follow_wall.py" name="follow_wall"/>
+    <node pkg="turtlebot3" type="bug2.py" name="bug2"/>
 </launch>
