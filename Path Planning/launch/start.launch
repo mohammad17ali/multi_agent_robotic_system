@@ -1,0 +1,5 @@
+<launch>
+  <node pkg = "vh_183378_miniprj" type = "follow_wall.py" name = "wall_follower" />
+  <node pkg = "vh_183378_miniprj" type = "go_to_point.py" name = "go_to_point" />
+  <node pkg = "vh_183378_miniprj" type = "bug_2.py" name = "bug2" output = "screen" />
+</launch>
