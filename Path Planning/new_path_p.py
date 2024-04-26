@@ -10,6 +10,7 @@ import cv2.aruco as aruco
 import time
 import scipy.io
 from geometry_msgs.msg import Twist
+import heapq
 
 global s, id_list, Coordinates_list,z_anglist,ite,initial_time,move,flag,xin,yin,zangin,x,y,zangle,dist,poseid
 s = 0.5
@@ -40,10 +41,16 @@ move.angular.x = 0
 move.angular.y = 0
 move.angular.z = 0
 
-class IntelSubscriber:
+class realsense:
     global ite
     def __init__(self):
        rospy.init_node('realsense_subscriber_rgb',anonymous=True)
+
+        self.start_pose_pub = rospy.Publisher('start_pose', PoseStamped, queue_size=10)
+        self.target_pose_pub = rospy.Publisher('target_pose', PoseStamped, queue_size=10)
+        self.rate = rospy.Rate(10)  # 10 Hz
+        self.start_pose = PoseStamped()  # Initialize the start pose message
+        self.target_pose = PoseStamped()
        
        self.bridge = CvBridge()
        #self.camera_info_sub = rospy.Subscriber('/realsense/camera/rgb/camera_info', CameraInfo, self.CameraCallback)
@@ -52,7 +59,8 @@ class IntelSubscriber:
        #print("RGB", self.rgb_image," Depth ",self.depth_image)
        #self.ArucoDetector()
     
-    def IntelSubscriberRGB(self,msg):
+    
+    def aruco_coords(self,msg):
        global ite,flag,initial_time,flag,initial_time,xin,yin,zangin,move,ctime_mat,c_mat,dist_mat,RelPosition
        if ite == 0:
           initial_time = time.time()
@@ -168,15 +176,18 @@ class IntelSubscriber:
                 poseid.append([ids[i,0],marker_x,marker_y,z_ang])
                 
                 if ids[i,0] == 3 and flag == 0:
+                    
                    print("yes")
                    xin = marker_x
                    yin = marker_y
                    zangin = z_ang
                    flag = 1
-                elif ids[i,0] == 3 and flag == 1:
+                   start_pose = [xin,yin,0]
+                elif ids[i,0] == 4 and flag == 1:
                    x = marker_x
                    y = marker_y
                    zangle = z_ang
+                   target_pose = [x,y,0]
                  
                 #print(ids[i]," ", marker_x, " ",marker_y)
                 marker_text = "ID: {} ({:.2f}, {:.2f})".format(ids[i][0], marker_x, marker_y)
@@ -187,6 +198,10 @@ class IntelSubscriber:
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
                 cv2.aruco.drawDetectedMarkers(rgb_image, corners)
+                 self.publish_start_pose(start_pose)
+                 self.publish_target_pose(target_pose)
+                 self.rate.sleep()
+                
        print("id list",id_list,"Coordinates list",Coordinates_list,"z_anglist",z_anglist)
        cv2.imshow("ArUco Marker Detection", rgb_image)
        # Exit the program when the 'Esc' key is pressed
@@ -221,6 +236,22 @@ class IntelSubscriber:
           dist_mat1 = np.array(dist_mat)
           scipy.io.savemat('Aruco.mat', dict(idmat=id_mat1, Coodmat=Coordinates_mat1, zmat=z_ang_mat1, cmat=c_mat1, ctimemat = ctime_mat1, timemat = time_mat1,distmat = dist_mat1))
 
+    def publish_start_pose(self, start_pose):
+        # Update the start pose message
+        self.start_pose.header.stamp = rospy.Time.now()
+        self.start_pose.pose = start_pose
+        # Publish the start pose message
+        self.start_pose_pub.publish(self.start_pose)
+        rospy.loginfo("Published start pose: {}".format(start_pose))
+
+    def publish_target_pose(self, target_pose):
+        # Update the target pose message
+        self.target_pose.header.stamp = rospy.Time.now()
+        self.target_pose.pose = target_pose
+        # Publish the target pose message
+        self.target_pose_pub.publish(self.target_pose)
+        rospy.loginfo("Published target pose: {}".format(target_pose))
+        
     def coordinates(self, calib_coords,x_,y_,theta):
        x1,y1,x2,y2 = calib_coords
        tan = np.tan(theta)
@@ -261,29 +292,7 @@ class IntelSubscriber:
        #z_angle = z_angle/4
        return rvecs, tvecs, z_angle, trash
     
-    def controller(self,x,y,zang,xin,yin,zangin,ctime_mat,c_mat,dist_mat):
-       global dist,goalx,goaly,move
-       alpha = 0.1
-       k = 0.1
-       goalx = 0.6#xin + 0.6*np.cos(zangin+np.pi/4)
-       goaly = 0.6#yin + 0.6*np.sin(zangin+np.pi/4)
-       dist = np.sqrt((goalx-x)**2 +(goaly-y)**2)
-       desired_orientation = np.arctan2((goaly - y),(goalx - x))
-       orientation_error = desired_orientation - zang
-       orientation_error%=(2*np.pi)
-       if orientation_error>np.pi:
-          orientation_error-= 2*np.pi
-          
-       if np.absolute(dist) > 0.01:
-          move.linear.x = alpha*dist
-          move.angular.z = -k*orientation_error
-       else:
-          move.linear.x = 0
-          move.angular.z = 0
-       ctime = time.time()
-       dist_mat.append(dist)
-       c_mat.append([move.linear.x,move.angular.z])
-       ctime_mat.append(ctime)
+    
        
     def RelPos(self, poseid):
        RelPosition = None
@@ -293,8 +302,119 @@ class IntelSubscriber:
              RelPosition[i*len(pose_sort)+j,0] = pose_sort[i,1]-pose_sort[j,1]
              RelPosition[i*len(pose_sort)+j,1] = pose_sort[i,2]-pose_sort[j,2]
        return RelPosition  
-       
+'''
+##Path Planning (D*lite)
 
+class BasicPathPlanner:
+    def __init__(self, grid_width, grid_height):
+        self.grid_width = grid_width
+        self.grid_height = grid_height
+        self.obstacle_map = np.zeros((grid_width, grid_height), dtype=int)
+
+    def update_obstacle_map(self, lidar_data):
+        # Update obstacle map based on Lidar sensor data
+        # lidar_data: list of 360 proximity values representing obstacles
+        for angle, distance in enumerate(lidar_data):
+            x = int(distance * np.cos(np.radians(angle)))  # Convert polar coordinates to Cartesian
+            y = int(distance * np.sin(np.radians(angle)))
+            if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
+                self.obstacle_map[x, y] = 1  # Mark obstacle in obstacle map
+
+    def plan_path(self, start, target):
+        # A* path planning algorithm
+        # start: tuple (x, y) representing start point
+        # target: tuple (x, y) representing target point
+        # Returns: list of tuples representing path from start to target
+        # Placeholder implementation, replace with actual A* algorithm
+        
+        # Here's a placeholder implementation returning a straight-line path from start to target
+        path = []
+        current = start
+        while current != target:
+            path.append(current)
+            x_diff = target[0] - current[0]
+            y_diff = target[1] - current[1]
+            if x_diff > 0:
+                current = (current[0] + 1, current[1])
+            elif x_diff < 0:
+                current = (current[0] - 1, current[1])
+            elif y_diff > 0:
+                current = (current[0], current[1] + 1)
+            else:
+                current = (current[0], current[1] - 1)
+        path.append(target)
+        return path
+'''
+## Motion Controller
+import rospy
+from geometry_msgs.msg import PoseStamped, Twist
+from math import atan2, sqrt
+
+class Controller:
+    def __init__(self):
+        self.start_pose = None
+        self.target_pose = None
+        self.current_pose = None
+        rospy.Subscriber('target_pose', PoseStamped, self.handle_pose)
+        rospy.Subscriber('current_pose', PoseStamped, self.update_current_pose)
+        self.velocity_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
+        self.rate = rospy.Rate(10)  # 10 Hz
+
+    def handle_pose(self, pose):
+        if self.start_pose is None:
+            # Set start pose
+            self.start_pose = pose
+            print("Received start pose:", self.start_pose)
+        else:
+            print("Ignoring additional pose:", pose)
+
+    def update_current_pose(self, pose):
+        self.start_pose = pose
+        self.current_pose = pose
+
+    def move_to_target(self):
+        if self.start_pose is None or self.target_pose is None:
+            print("Missing start or target pose. Cannot move.")
+            return
+        print("Moving from", self.start_pose, "to", self.target_pose)
+        
+        while not rospy.is_shutdown():
+            if self.current_pose is not None:
+                current_x = self.current_pose.pose.position.x
+                current_y = self.current_pose.pose.position.y
+                target_x = self.target_pose.pose.position.x
+                target_y = self.target_pose.pose.position.y
+
+                distance_to_target = sqrt((target_x - current_x) ** 2 + (target_y - current_y) ** 2)
+
+                if distance_to_target < 0.1:
+                    print("Reached target pose")
+                    break
+
+                angle_to_target = atan2(target_y - current_y, target_x - current_x)
+
+                move_cmd = Twist()
+                move_cmd.linear.x = 0.2  # Constant linear velocity
+                move_cmd.angular.z = 0.5 * angle_to_target  # Adjusting angular velocity based on angle to target
+                self.velocity_pub.publish(move_cmd)
+            
+            self.rate.sleep()
+
+        # Reset start and target poses after completing the motion
+        self.start_pose = None
+        self.target_pose = None
+
+##
+if __name__ == '__main__':
+    try:
+        rospy.init_node('controller_node', anonymous=True)
+        #planner = BasicPathPlanner(grid_width=100, grid_height=100)  # Example grid size
+        controller = Controller()
+        subscriber = IntelSubscriber()
+        rospy.spin()
+    except rospy.ROSInterruptException:
+        pass
+##
 if __name__ == '__main__':
     try:
        velocity_pub = rospy.Publisher('tb3_0/cmd_vel', Twist, queue_size=10)
