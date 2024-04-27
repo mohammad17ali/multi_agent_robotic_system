@@ -405,6 +405,7 @@ class Controller:
         self.target_pose = None
 
 ##
+'''
 if __name__ == '__main__':
     try:
         rospy.init_node('controller_node', anonymous=True)
@@ -414,6 +415,7 @@ if __name__ == '__main__':
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
+'''
 ##
 if __name__ == '__main__':
     try:
