@@ -379,6 +379,8 @@ class IntelSubscriber:
           trash.append(nada)
        #z_angle = z_angle/4
        return rvecs, tvecs, z_angle, trash
+
+### bug2
     
     def controller(self,x,y,zang,xin,yin,zangin,ctime_mat,c_mat,dist_mat,xdot_mat,move):
        global initial_time
@@ -406,8 +408,11 @@ class IntelSubscriber:
        xdot_mat.append([xdot,ydot])
        c_mat.append([move.linear.x,move.angular.z])
        #ctime_mat.append(ctime)
-       
-    def RelController(self,poseid,RelPose,Form,goallist,Formerror,Disterror,move,lead,c_mat,ctime_mat,PI_error,x_dotmat,x_err):
+
+
+
+def RelController(self,poseid,RelPose,Form,goallist,Formerror,Disterror,move,lead,c_mat,ctime_mat,PI_error,x_dotmat,x_err):
+    
        dx = Form[0]
        dy = Form[1]
        l = 0.13
@@ -502,6 +507,80 @@ class IntelSubscriber:
        elif tr==0:
           off = np.array([0.6,0.6])
           return list(start+off)
+
+class Bug2Controller:
+    def __init__(self, map_size, start, goal, costmap):
+        self.map_size = map_size
+        self.start = start
+        self.goal = goal
+        self.costmap = costmap
+        self.state = 'INIT'
+        self.hit_point = None
+        self.min_dist = float('inf')
+
+    def controller(self, x, y, zang, xin, yin, zangin):
+        current_pos = (int(x), int(y))  # Current position (obtained from robot's odometry)
+
+        if self.state == 'INIT':
+            self.move_to_goal(current_pos)
+        elif self.state == 'GOAL_REACHED':
+            # Robot has reached the goal
+            # Perform necessary actions (e.g., stop)
+            pass
+        elif self.state == 'OBSTACLE_AVOIDANCE':
+            self.avoid_obstacle(current_pos)
+        elif self.state == 'TRACING_WALL':
+            self.trace_wall(current_pos)
+
+    def move_to_goal(self, current_pos):
+        # Move towards the goal until an obstacle is encountered
+        if current_pos == self.goal:
+            self.state = 'GOAL_REACHED'
+            return
+        dx = self.goal[0] - current_pos[0]
+        dy = self.goal[1] - current_pos[1]
+        dist = np.sqrt(dx ** 2 + dy ** 2)
+        if dist < self.min_dist:
+            self.min_dist = dist
+        else:
+            self.state = 'OBSTACLE_AVOIDANCE'
+            self.hit_point = current_pos
+        # Calculate control commands to move towards the goal
+        # Adjust linear and angular velocities accordingly
+
+    def avoid_obstacle(self, current_pos):
+        # Move around the obstacle until reaching a point closer to the goal
+        dx_goal = self.goal[0] - current_pos[0]
+        dy_goal = self.goal[1] - current_pos[1]
+        dist_to_goal = (dx_goal ** 2 + dy_goal ** 2) ** 0.5
+
+        dx_hit = self.hit_point[0] - current_pos[0]
+        dy_hit = self.hit_point[1] - current_pos[1]
+        dist_to_hit = (dx_hit ** 2 + dy_hit ** 2) ** 0.5
+
+        if dist_to_goal < dist_to_hit:
+            self.state = 'GOAL_REACHED'
+            return
+        else:
+            self.state = 'TRACING_WALL'
+
+        # Calculate control commands to navigate around the obstacle
+        # Adjust linear and angular velocities accordingly
+
+    def trace_wall(self, current_pos):
+        # Follow the obstacle contour until a clear path to the goal is found
+        dx_goal = self.goal[0] - current_pos[0]
+        dy_goal = self.goal[1] - current_pos[1]
+        dist_to_goal = (dx_goal ** 2 + dy_goal ** 2) ** 0.5
+
+        # Check if there is a clear path to the goal
+        if self.costmap[self.hit_point[0]][self.hit_point[1]] == 0:
+            self.state = 'GOAL_REACHED'
+            return
+
+        # Calculate control commands to trace the obstacle contour
+        # Adjust linear and angular velocities accordingly
+
        
        
     
@@ -513,16 +592,12 @@ if __name__ == '__main__':
        server2 = Server(3)
        rs_subscriber = IntelSubscriber()
        
-       velocity_pub1 = rospy.Publisher('tb3_0/cmd_vel', Twist, queue_size=10)
-       pose_subscriber1 = rospy.Subscriber('tb3_0/odom', Odometry, server1.odom_callback)
-       lidar_subscriber1 = rospy.Subscriber('tb3_0/scan', LaserScan, server1.lidar_callback)
-       velocity_pub2 = rospy.Publisher('tb3_1/cmd_vel', Twist, queue_size=10)
-       pose_subscriber2 = rospy.Subscriber('tb3_1/odom', Odometry, server2.odom_callback)
-       lidar_subscriber2 = rospy.Subscriber('tb3_1/scan', LaserScan, server2.lidar_callback)
+       velocity_pub = rospy.Publisher('tb3_0/cmd_vel', Twist, queue_size=10)
+       pose_subscriber = rospy.Subscriber('tb3_0/odom', Odometry, server1.odom_callback)
+       lidar_subscriber = rospy.Subscriber('tb3_0/scan', LaserScan, server1.lidar_callback)
        rate = rospy.Rate(10)
        while not rospy.is_shutdown():
-          velocity_pub1.publish(move2)
-          velocity_pub2.publish(move1)
+          velocity_pub.publish(move)
           rate.sleep()
        rospy.spin()
     except rospy.ROSInterruptException:
