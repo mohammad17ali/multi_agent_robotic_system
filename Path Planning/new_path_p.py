@@ -302,49 +302,7 @@ class realsense:
              RelPosition[i*len(pose_sort)+j,0] = pose_sort[i,1]-pose_sort[j,1]
              RelPosition[i*len(pose_sort)+j,1] = pose_sort[i,2]-pose_sort[j,2]
        return RelPosition  
-'''
-##Path Planning (D*lite)
 
-class BasicPathPlanner:
-    def __init__(self, grid_width, grid_height):
-        self.grid_width = grid_width
-        self.grid_height = grid_height
-        self.obstacle_map = np.zeros((grid_width, grid_height), dtype=int)
-
-    def update_obstacle_map(self, lidar_data):
-        # Update obstacle map based on Lidar sensor data
-        # lidar_data: list of 360 proximity values representing obstacles
-        for angle, distance in enumerate(lidar_data):
-            x = int(distance * np.cos(np.radians(angle)))  # Convert polar coordinates to Cartesian
-            y = int(distance * np.sin(np.radians(angle)))
-            if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
-                self.obstacle_map[x, y] = 1  # Mark obstacle in obstacle map
-
-    def plan_path(self, start, target):
-        # A* path planning algorithm
-        # start: tuple (x, y) representing start point
-        # target: tuple (x, y) representing target point
-        # Returns: list of tuples representing path from start to target
-        # Placeholder implementation, replace with actual A* algorithm
-        
-        # Here's a placeholder implementation returning a straight-line path from start to target
-        path = []
-        current = start
-        while current != target:
-            path.append(current)
-            x_diff = target[0] - current[0]
-            y_diff = target[1] - current[1]
-            if x_diff > 0:
-                current = (current[0] + 1, current[1])
-            elif x_diff < 0:
-                current = (current[0] - 1, current[1])
-            elif y_diff > 0:
-                current = (current[0], current[1] + 1)
-            else:
-                current = (current[0], current[1] - 1)
-        path.append(target)
-        return path
-'''
 ## Motion Controller
 import rospy
 from geometry_msgs.msg import PoseStamped, Twist
