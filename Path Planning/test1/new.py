@@ -48,7 +48,7 @@ class DepthCamera:
 
 class CoordsPublisher:
     def __init__(self):
-        self.x1_ = self.y1_ = self.z1_ = x2_= self.y2_ = self.z2_ = 0
+        x1_ = y1_ = z1_ = x2_= y2_ = z2_ = 0
         rospy.init_node('coords_publisher',anonymous=True)
         self.start_pub = rospy.Publisher('/start_pub', Point, queue_size=10)
         self.target_pub = rospy.Publisher('/target_pub', Point, queue_size=10)
@@ -66,6 +66,7 @@ class CoordsPublisher:
        
     def capture_and_publish(self):
         try:
+		
            
             while not rospy.is_shutdown():
                 frames = self.pipeline.wait_for_frames()
