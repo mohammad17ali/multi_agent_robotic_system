@@ -1,0 +1,7 @@
+<launch>
+    <!-- Start the robot -->
+    <node pkg="turtlebot3_gazebo" type="turtlebot3_world.launch" name="turtlebot3_world" output="screen"/>
+
+    <!-- Start the obstacle avoider node -->
+    <node pkg="turtlebot3_example" type="obstacle_avoider.py" name="obstacle_avoider" output="screen"/>
+</launch>
