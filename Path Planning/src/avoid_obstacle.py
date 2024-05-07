@@ -5,7 +5,9 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist, Point
 import math 
-import numpy
+from math import pi
+import numpy as np
+from tf.transformations import euler_from_quaternion
 
 
 LINEAR_VEL = 0.22
@@ -127,10 +129,10 @@ class PathPlanner:
         dist = np.sqrt((goalY - currentY)**2 + (goalX - goalY)**2)
         path_angle = np.arctan((goalY-currentY)/(goalX-currentX))
         if path_angle < -pi/4 or path_angle > pi/4:
-                if goal_y < 0 and y_start < goal_y:
-                    path_angle = -2*pi + path_angle
-                elif goal_y >= 0 and y_start > goal_y:
-                    path_angle = 2*pi + path_angle
+            if goalY < 0 and currentY < goalY:
+                path_angle = -2*pi + path_angle
+            elif goalY >= 0 and currentY > goalY:
+                path_angle = 2*pi + path_angle
             if last_rotation > pi-0.1 and rotation <= 0:
                 rotation = 2*pi + rotation
             elif last_rotation < -pi+0.1 and rotation > 0:
@@ -157,13 +159,21 @@ class PathPlanner:
     
     def get_odom(self):
         try:
+            self.tf_listener.waitForTransform(self.odom_frame, 'base_footprint', rospy.Time(), rospy.Duration(1.0))
+            self.base_frame = 'base_footprint'
+        except (tf.Exception, tf.ConnectivityException, tf.LookupException):
+            try:
+                self.tf_listener.waitForTransform(self.odom_frame, 'base_link', rospy.Time(), rospy.Duration(1.0))
+                self.base_frame = 'base_link'
+            except (tf.Exception, tf.ConnectivityException, tf.LookupException):
+                rospy.loginfo("Cannot find transform between odom and base_link or base_footprint")
+                rospy.signal_shutdown("tf Exception")
+        try:
             (trans, rot) = self.tf_listener.lookupTransform(self.odom_frame, self.base_frame, rospy.Time(0))
             rotation = euler_from_quaternion(rot)
-
         except (tf.Exception, tf.ConnectivityException, tf.LookupException):
             rospy.loginfo("TF Exception")
             return
-
         return (Point(*trans), rotation[2])
 
     def stop_robot(self):
@@ -173,16 +183,18 @@ class PathPlanner:
         self.cmd_vel.publish(stop_msg)
         
     def Controller(self):
-        (self.goal_x, self.goal_y, self.goal_z) = self.getkey()
+        (self.goal.x, self.goal.y, self.goal.z) = self.getkey()
         try:
             if self.obstacle_detector():
                 print('Obstacle Detected')
-                self.stop_bot()
+                self.stop_robot()
                 self.cmd_vel.publish(Twist())
                 self.deal_obstacle()
                 return
             else:
                 self.goToPoint()
+        except rospy.ROSInterruptException:
+            pass
             
             
 '----------------------------------------------------------'
