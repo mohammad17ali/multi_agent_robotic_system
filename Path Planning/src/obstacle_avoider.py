@@ -143,10 +143,23 @@ class GotoPoint():
     def check_obstacle(self):
         scan = rospy.wait_for_message('scan', LaserScan)
         lidar_distances = scan.ranges
+        ranges = lidar_distances
 
-        min_distance = min(lidar_distances)
-        if min_distance < SAFE_STOP_DISTANCE:
-            return True
+        # Assuming the angle_min and angle_max are provided in radians
+        angle_min = data.angle_min
+        angle_max = data.angle_max
+        angle_increment = data.angle_increment
+
+        # Convert angles to indices in ranges array
+        index_min = int(((-45 * 3.14159 / 180) - angle_min) / angle_increment)
+        index_max = int(((45 * 3.14159 / 180) - angle_min) / angle_increment)
+
+        # Check distances in the specified range
+        for i in range(index_min, index_max + 1):
+            if ranges[i] < SAFE_STOP_DISTANCE:
+                rospy.loginfo("Obstacle detected at {:.2f} degrees. Distance: {:.2f} meters".format(
+                    angle_min + i * angle_increment, ranges[i]))
+                return True
         return False
 
     def shutdown(self):
