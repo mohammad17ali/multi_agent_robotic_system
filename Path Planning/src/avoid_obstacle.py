@@ -3,86 +3,195 @@ import rospy
 import tf
 from nav_msgs.msg import Odometry 
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, Point
 import math 
 import numpy
 
-# Commanded velocity 
-move = Twist() # defining the variable to hold values
-move.linear.x = 0
-move.linear.y = 0
-move.linear.z = 0
-move.angular.x = 0
-move.angular.y = 0
-move.angular.z = 0
+
+LINEAR_VEL = 0.22
+STOP_DISTANCE = 0.2
+LIDAR_ERROR = 0.05
+SAFE_STOP_DISTANCE = STOP_DISTANCE + LIDAR_ERROR
 
 class PathPlanner:
     def __init__(self):
-        self.
-    def controller(v, omega):
-        move.linear.x = v
-        move.angular.z = omega
+        rospy.init_node('turtlebot3_path_planner', anonymous=False)
+        rospy.on_shutdown(self.shutdown)
+        self.cmd_vel = rospy.Publisher('cmd_vel', Twist, queue_size=5)
+        self.current = Point()
+        self.goal = Point()
+        self.move_cmd = Twist()
+        r = rospy.Rate(10)
+        self.tf_listener = tf.TransformListener()
+        self.odom_frame = 'odom'
+        r = rospy.Rate(10)
+        self.tf_listener = tf.TransformListener()
+        self.odom_frame = 'odom'
         
-    #############################Edit only this function######
-    def lidar_callback(msg):
-        #Make sense of the callback data
-        #rostopic echo msg
-        #0 to 359 aray index values with each value at a degree increment 
-        #range should be in meters
-        #The readings start from left and go counter clockwise
-        RANGES=msg.ranges
-        #Get range measurements from the front left side of the robot [from 0degrees to 90degrees]
-        left=list(RANGES[0:91])
-    
-        #Get range measurements from the front right side of the robot [from 270degrees to 359degrees]
-        right=list(RANGES[270:])
-    
-        
-        #Replace zero readings with some large number
-        i=0
-        while(i<len(left)):
-            if(left[i]<=msg.range_min):
-                left[i]=10000
-            i+=1
-            
-        i=0
-        while(i<len(right)):
-            if(right[i]<=msg.range_min):
-                right[i]=10000
-            i+=1
-    
-        
-        #Find the minimum range measurement from both sides
-        min_range_left=min(left)
-        min_range_right=min(right)
-    
-        
-        if min_range_left > 0.4 and min_range_right > 0.4:
-            print("Drive straight")
-            controller(0.05,0.0)
-            return
-    	
-        if min_range_left < 0.4 and min_range_right > 0.4:
-            print("Turn right")
-            controller(0.05, -0.225)
-            return
-            
-        if min_range_left > 0.4 and min_range_right < 0.4:
-            print("Turn left")
-            controller(0.05, 0.225)
-            return
-            
-        if min_range_left < 0.2 and min_range_right < 0.2:
-            print("Stop robot")
-            controller(0.0, 0.0)
-            return 
-#############################Edit only this function######
-  
-rospy.init_node('Go_to_goal')  # Defines a node with name of Go_to_goal
-velocity_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-lidar_subscriber = rospy.Subscriber('/scan', LaserScan, lidar_callback)
-rate = rospy.Rate(10)
-while not rospy.is_shutdown(): 
-    velocity_pub.publish(move)
-    rate.sleep()
+        self.MIN_LIMIT = 0.25
 
+    def obstacle_detector(self,msg):
+        scan = rospy.wait_for_message('scan', LaserScan)
+        lidar_distances = scan.ranges
+        RANGES = scan.ranges
+        left_view = list(RANGES[0:91])
+        right_view =list(RANGES[270:])
+
+        i=0
+        while(i<len(left_view)):
+            if(left_view[i]<=msg.range_min):
+                self.left_view[i]=10000
+            i+=1
+        i=0
+        while(i<len(right_view)):
+            if(right_view[i]<=msg.range_min):
+                right_view[i]=10000
+            i+=1
+            
+        min_range_left=min(left_view)
+        min_range_right=min(right_view)
+        if (min_range_left < self.MIN_LIMIT) or (min_range_right < self.MIN_LIMIT):
+            return True
+        return False
+
+
+    def deal_obstacle(self):
+        print('Rounding the obstacle')
+        scan = rospy.wait_for_message('scan', LaserScan)
+        lidar_distances = scan.ranges
+        RANGES = scan.ranges
+        left_view = list(RANGES[0:91])
+        left_most=list(RANGES[88:93])
+        right_view =list(RANGES[270:])
+        right_most =list(RANGES[268:273])
+
+        i=0
+        while(i<len(left_view)):
+            if(left_view[i]<=msg.range_min):
+                self.left_view[i]=10000
+            i+=1
+        i=0
+        while(i<len(right_view)):
+            if(right_view[i]<=msg.range_min):
+                right_view[i]=10000
+            i+=1
+            
+        while(i<len(left_most)):
+            if(left_most[i]<=msg.range_min):
+                left_most[i]=10000
+            i+=1
+        i=0
+        while(i<len(right_most)):
+            if(right_most[i]<=msg.range_min):
+                right_most[i]=10000
+            i+=1
+            
+        min_range_left=min(left_view)
+        min_left_ind = left_view.index(min_range_left)
+        turn_left_ang = 270 - min_left_ind
+        turn_left_rad = (turn_left_ang/180)*3.14
+        
+        left_rad = 
+        
+        
+        min_right_ind = right_view.index(min_range_right)
+        turn_right_ang = 90 - min_right_ind
+        turn_right_rad = (turn_right_ang/180)*3.14
+        
+        left_most = min(left_most)
+        right_most = min(right_most)
+        
+        if min_range_left < self.MIN_LIMIT and min_range_right > self.MIN_LIMIT:
+            print("Turning right")
+            self.move_cmd.angular.z = turn_left_rad
+        elif min_range_left > self.MIN_LIMIT and min_range_right < self.MIN_LIMIT:
+            print("Turning Left")
+            self.move_cmd.angular.z = turn_right_rad
+        elif (min_range_left == min_range_right) and  min_range_right < self.MIN_LIMIT:
+            print('Turning right')
+            self.move_cmd.angular.z = 1.57
+        else:
+            print('Obstacle Overcame')
+            self.Controller()
+            
+                   
+    def goToPoint(self):
+        (position, rotation) = self.get_odom()
+        last_rotation = 0
+        linear_speed = 1
+        angular_speed = 1
+        goalX = self.goal.x
+        goalY = self.goal.y
+        currentX = self.current.x
+        currentY = self.current.y
+        dist = np.sqrt((goalY - currentY)**2 + (goalX - goalY)**2)
+        path_angle = np.arctan((goalY-currentY)/(goalX-currentX))
+        if path_angle < -pi/4 or path_angle > pi/4:
+                if goal_y < 0 and y_start < goal_y:
+                    path_angle = -2*pi + path_angle
+                elif goal_y >= 0 and y_start > goal_y:
+                    path_angle = 2*pi + path_angle
+            if last_rotation > pi-0.1 and rotation <= 0:
+                rotation = 2*pi + rotation
+            elif last_rotation < -pi+0.1 and rotation > 0:
+                rotation = -2*pi + rotation
+            self.move_cmd.angular.z = angular_speed * path_angle-rotation
+            self.move_cmd.linear.x = min(linear_speed * dist, 0.1)
+
+            #if self.move_cmd.angular.z > 0:
+                #self.move_cmd.angular.z = min(self.move_cmd.angular.z, 1.5)
+            #else:
+                #self.move_cmd.angular.z = max(self.move_cmd.angular.z, -1.5)
+
+            last_rotation = rotation
+            self.cmd_vel.publish(self.move_cmd)
+            
+            
+        
+    def getkey(self):
+        x, y, z = input("| x | y | z |\n").split()
+        if x == 's':
+            self.shutdown()
+        x, y, z = [float(x), float(y), float(z)]
+        return x, y, z
+    
+    def get_odom(self):
+        try:
+            (trans, rot) = self.tf_listener.lookupTransform(self.odom_frame, self.base_frame, rospy.Time(0))
+            rotation = euler_from_quaternion(rot)
+
+        except (tf.Exception, tf.ConnectivityException, tf.LookupException):
+            rospy.loginfo("TF Exception")
+            return
+
+        return (Point(*trans), rotation[2])
+
+    def stop_robot(self):
+        stop_msg = Twist()
+        stop_msg.linear.x = 0.0
+        stop_msg.angular.z = 0.0
+        self.cmd_vel.publish(stop_msg)
+        
+    def Controller(self):
+        (self.goal_x, self.goal_y, self.goal_z) = self.getkey()
+        try:
+            if self.obstacle_detector():
+                print('Obstacle Detected')
+                self.stop_bot()
+                self.cmd_vel.publish(Twist())
+                self.deal_obstacle()
+                return
+            else:
+                self.goToPoint()
+            
+            
+'----------------------------------------------------------'
+
+
+if __name__ == '__main__':
+    Planner = PathPlanner()
+    try:
+        while not rospy.is_shutdown():
+            Planner.Controller()
+    except:
+        rospy.loginfo("shutdown program.")
