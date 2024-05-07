@@ -29,10 +29,13 @@ def lidar_callback(msg):
     #The readings start from left and go counter clockwise
     RANGES=msg.ranges
     #Get range measurements from the front left side of the robot [from 0degrees to 90degrees]
-    left=list(RANGES[0:91])
+    left=list(RANGES[0:46])
+    left_most = list(RANGES[88:93])
+    
 
     #Get range measurements from the front right side of the robot [from 270degrees to 359degrees]
-    right=list(RANGES[270:])
+    right=list(RANGES[315:])
+    right_most=list(RANGES[268:273])
 
     
     #Replace zero readings with some large number
@@ -50,19 +53,37 @@ def lidar_callback(msg):
 
     
     #Find the minimum range measurement from both sides
-    min_range_left=min(left)
-    min_range_right=min(right)
+    min_range_left = min(left)
+    left_ind = left.index(min_range_left)
+    min_range_left_rad = (min_range_left*3.14/360)
+    left_most_dist = min(list(RANGES[88:93]))
 
-    
-    if min_range_left > 0.4 and min_range_right > 0.4:
+    min_range_right = min(right)
+    right_ind = right.index(min_range_right)
+    min_range_right_rad = (min_range_right*3.14/360)
+    right_most_dist = min(list(RANGES[268:273]))
+
+    if self.obstacle_detected():
+	print('Obstacle Detected")
+	
+	if min_range_left < 0.25 and min_range_right > 0.25:
+	    self.stop_bot()
+	    print("Turning right")
+	    move.angular(-0.225)
+	    
+	    controller(0.05, -0.225)
+        return
+	    
+        
+	
+
+	    
+	if min_range_left > 0.4 and min_range_right > 0.4: #Obstacle on left
         print("Drive straight")
         controller(0.05,0.0)
         return
 	
-    if min_range_left < 0.4 and min_range_right > 0.4:
-        print("Turn right")
-        controller(0.05, -0.225)
-        return
+    
         
     if min_range_left > 0.4 and min_range_right < 0.4:
         print("Turn left")
@@ -73,6 +94,10 @@ def lidar_callback(msg):
         print("Stop robot")
         controller(0.0, 0.0)
         return 
+	
+
+    
+def wall_follower(
 #############################Edit only this function######
   
 rospy.init_node('Go_to_goal')  # Defines a node with name of Go_to_goal
