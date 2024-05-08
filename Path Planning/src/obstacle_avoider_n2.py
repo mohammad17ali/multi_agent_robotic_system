@@ -90,6 +90,7 @@ class PathPlanner():
                 r.sleep()
                 if self.obstacle_detector():
                     rospy.loginfo("Obstacle detected")
+                    self.deal_obstacle()
                     self.cmd_vel.publish(Twist())
                     return
     
@@ -208,20 +209,33 @@ class PathPlanner():
         
         left_most = min(left_most)
         right_most = min(right_most)
+        flag = 0
         while self.obstacle_detector():
             if min_range_left < self.MIN_LIMIT and min_range_right > self.MIN_LIMIT:
+                flag =1
                 print("Turning right")
                 self.move_cmd.angular.z = turn_left_rad
             elif min_range_left > self.MIN_LIMIT and min_range_right < self.MIN_LIMIT:
                 print("Turning Left")
+                flag =2
                 self.move_cmd.angular.z = turn_right_rad
             elif (min_range_left == min_range_right) and  min_range_right < self.MIN_LIMIT:
                 print('Turning right')
+                flag = 2
                 self.move_cmd.angular.z = 0.5
             else:
                 pass
             self.cmd_vel.publish(self.move_cmd)
         print('Obstacle Overcame')
+        if flag !=0:
+            self.move_cmd.linear.x = 0.2
+            if self.obstacle_detector():
+                self.deal_obstacle()
+            else:
+                pass
+        else:
+            pass
+            
         return
         #self.Controller()
 
