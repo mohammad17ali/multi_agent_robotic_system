@@ -53,7 +53,7 @@ class PathPlanner():
         if self.obs == 'null':
             self.go_to_point()
             r.sleep()
-        else:
+        while self.obs != 'null':
             print('else')
             self.deal_obstacle()
             r.sleep()
@@ -108,6 +108,7 @@ class PathPlanner():
             self.cmd_vel.publish(self.move_cmd)
             rospy.sleep(0.1)
             if self.obstacle_detector():
+                print('stopping gtp')
                 break
             else:
                 pass
@@ -154,6 +155,7 @@ class PathPlanner():
         rightm = ranges[268:273]
         leftm_min = min(leftm)
         rightm_min = min(rightm)
+        self.obs = 'null'
         if min(ranges) < self.lowest_allowed_dist:
             print('Obstacle detected too close')
             self.controller(-0.5, 0)
@@ -215,6 +217,7 @@ class PathPlanner():
 
 
     def get_odom(self):
+        print('get_odom')
         try:
             (trans, rot) = self.tf_listener.lookupTransform(self.odom_frame, self.base_frame, rospy.Time(0))
             rotation = euler_from_quaternion(rot)
@@ -224,11 +227,13 @@ class PathPlanner():
         return Point(*trans), rotation[2]
 
     def shutdown(self):
+        print('shutdown')
         rospy.loginfo("Shutting down...")
         self.cmd_vel.publish(Twist())
         rospy.sleep(1)
         
     def stop_robot(self):
+        print('stop_robot')
         print('Stopping Robot')
         self.move_cmd.linear.x = 0
         self.move_cmd.angular.z = 0
@@ -249,6 +254,7 @@ class PathPlanner():
 if __name__ == '__main__':
     try:
         planner = PathPlanner()
-        planner.run()
+        while not rospy.is_shutdown():
+            planner.run()
     except rospy.ROSInterruptException:
         pass
