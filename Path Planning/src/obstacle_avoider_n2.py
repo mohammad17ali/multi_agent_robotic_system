@@ -30,10 +30,11 @@ class PathPlanner():
         self.phase = 'gtp'  # Initialize phase to go to point
         self.obs = 'null'
         self.wall = 'null'
-        self.MIN_WALL_DIST = 0.25
+        self.MIN_WALL_DIST = 0.2
+        self.MIN_WALL_DIST_F = 0.3
         self.move_cmd = Twist()
         self.goal_x, self.goal_y, self.goal_z = self.get_goal()
-        self.lowest_allowed_dist = 0.1
+        self.lowest_allowed_dist = 0.12
         try:
             self.tf_listener.waitForTransform(self.odom_frame, 'base_footprint', rospy.Time(), rospy.Duration(1.0))
             self.base_frame = 'base_footprint'
@@ -79,16 +80,23 @@ class PathPlanner():
             print('Goal Reached')
             rospy.signal_shutdown('successful')
 
-        while distance > 0.1:
+        while not rospy.is_shutdown():
             position, rotation = self.get_odom()
-            x_start = position.x
-            y_start = position.y
-            path_angle = atan2(goal_y - y_start, goal_x - x_start)
+            curr_x = position.x
+            curr_y = position.y
+            rem_distance = sqrt(pow(goal_x - curr_x, 2) + pow(goal_y - curr_y, 2))
+            print('Remaining Distance: ', rem_distance)
+            if rem_distance < 0.1:
+                print('Goal Reached')
+                rospy.signal_shutdown('Successful')
+            else:
+                pass
+            path_angle = atan2(goal_y - curr_y, goal_x - curr_x)
 
             if path_angle < -pi/4 or path_angle > pi/4:
-                if goal_y < 0 and y_start < goal_y:
+                if goal_y < 0 and curr_y < goal_y:
                     path_angle = -2 * pi + path_angle
-                elif goal_y >= 0 and y_start > goal_y:
+                elif goal_y >= 0 and curr_y > goal_y:
                     path_angle = 2 * pi + path_angle
             if last_rotation > pi - 0.1 and rotation <= 0:
                 rotation = 2 * pi + rotation
@@ -96,7 +104,7 @@ class PathPlanner():
                 rotation = -2 * pi + rotation
 
             self.move_cmd.angular.z = angular_speed * path_angle - rotation
-            distance = sqrt(pow((goal_x - x_start), 2) + pow((goal_y - y_start), 2))
+            distance = sqrt(pow((goal_x - curr_x), 2) + pow((goal_y - curr_y), 2))
             self.move_cmd.linear.x = min(linear_speed * distance, 0.1)
 
             if self.move_cmd.angular.z > 0:
@@ -129,6 +137,11 @@ class PathPlanner():
                     self.move_cmd.angular.z = 0.5
             self.cmd_vel.publish(self.move_cmd)
             rospy.sleep(0.1)
+            if self.obstacle_detector():
+                print('stopping abs')
+                break
+            else:
+                pass 
 
         #rospy.loginfo("Stopping the robot...")
         self.cmd_vel.publish(Twist())
@@ -143,7 +156,7 @@ class PathPlanner():
       
     def obstacle_detector(self):
         print('obstacle_detector')
-        wall_limit = 0.1
+        wall_limit = 0.15
         scan = rospy.wait_for_message('scan', LaserScan)
         ranges = scan.ranges
     
@@ -170,22 +183,25 @@ class PathPlanner():
             self.wall = 'null'
             
         
-        if min(left_view) < self.MIN_WALL_DIST:
+        if min(left_view) < self.MIN_WALL_DIST_F:
             self.obs = 'left'
             #print('Obstacle on Left')
-        if min(right_view) < self.MIN_WALL_DIST:
+        if min(right_view) < self.MIN_WALL_DIST_F:
             #print('Obstacle on Right')
             self.obs = 'right'
     
         # Check for obstacles in the left and right views to detect wall obstacles
-        if min(front_view) < self.MIN_WALL_DIST:
-            while min(ranges) < self.lowest_allowed_dist:
-                print('Obstacle detected too close')
-                self.tmp = self.obs
-                self.obs = 'tooclose'
+        if min(front_view) < self.MIN_WALL_DIST_F:
+            if min(ranges) < self.lowest_allowed_dist:
+                self.tmp = 'tooclose'
+            #    print('Moving to a safe distance')
+           #     self.controller(-2,0)
                 #rospy.sleep(2)
+            else:
+                self.tmp = 'none'
             rospy.loginfo("Front obstacle detected")
             return True
+            
         
     
         # If no obstacles are detected
@@ -196,27 +212,39 @@ class PathPlanner():
     def deal_obstacle(self):
         print('deal_obstacle')
         if self.wall == 'null':
-            while self.obs =='tooclose':
+            if self.tmp == 'tooclose':
+                print('Obstacle detected too close')
                 print('Moving to a safe distance')
-                self.controller(-2,0)
-                #rospy.sleep(2)
-                self.obs = self.tmp
+        
+                self.cmd_vel.publish(self.move_cmd)
+                if self.obs == 'left':
+                    self.move_cmd.linear.x = -3
+                    self.move_cmd.angular.z = -2
+                    self.cmd_vel.publish(self.move_cmd)
+                  #  self.controller(-3, -1)
+                elif self.obs == 'right':
+                    self.move_cmd.linear.x = -3
+                    self.move_cmd.angular.z = 2
+                    self.cmd_vel.publish(self.move_cmd)
+                  #  self.controller(-3, 1)
+                rospy.sleep(2)
+            self.tmp = 'none'
             if self.obs == 'left':
                 print('Obstacle on Left')
-                self.controller(0.2, -1)
+                self.controller(0.2, -2)
             elif self.obs == 'right':
                 print('Obstacle on Right')
-                self.controller(0.2, 1)
+                self.controller(0.2, 2)
             else:
                 pass
         if self.wall == 'left':
             if self.obs == 'left':
                 print('Following wall on left')
-                self.controller(0.5,-0.2)
+                self.controller(0.5,-1)
         if self.wall == 'right':
             if self.obs == 'right':
                 print('Following wall on right')
-                self.controller(0.5,0.2)
+                self.controller(0.5,1)
           
         #rospy.loginfo("Obstacle cleared, continuing navigation")
  
@@ -236,7 +264,7 @@ class PathPlanner():
         print('shutdown')
         rospy.loginfo("Shutting down...")
         self.cmd_vel.publish(Twist())
-        rospy.signal_shutdown()
+        rospy.signal_shutdown('Function Called')
         
     def stop_robot(self):
         print('stop_robot')
