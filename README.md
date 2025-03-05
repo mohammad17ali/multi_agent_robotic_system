@@ -4,7 +4,7 @@
 **Mohammad Ali**
 
 ### In collaboration with:
-**[Adityanshu Abhinav]**(https://github.com/anotheruser)
+**Adityanshu Abhinav** [https://github.com/AadityanshuAbhinav]
 
 
 ### Under the Guidance of:
