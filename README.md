@@ -1,4 +1,8 @@
-# Dynamic Path Planning of Multi-Agent Robotic Systems
+# Dynamic Path Planning of Multi-Agent Robotic Systems (MARSs)
+
+This project aims to:
+- Develop an **adaptive** and **robust** path planning solution for MARSs.
+- Bridge the gap between theoretical algorithms and practical industry demands.
 
 ## By:
 **Mohammad Ali**
