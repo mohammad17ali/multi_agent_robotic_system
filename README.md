@@ -74,7 +74,7 @@ This project aims to:
 4. **D star Lite Algorithm** - Simplified real-time replanning.
 5. **Bug2 Algorithm** - Reactive boundary-following approach.
 
-### 4.2 Bug2-D* Lite: Hybrid Approach
+### 4.2 Bug-D: Hybrid Approach
 - **Combines Bug2's reactive avoidance with D star Lite’s real-time replanning**.
 - **Prioritizes direct line-of-sight movement** while adapting to dynamic obstacles.
 - **Leverages sensor fusion (LiDAR + Camera) for better environment perception**.
@@ -83,7 +83,7 @@ This project aims to:
 
 ## 5. Simulation and Testing
 ### 5.1 Gazebo Simulation
-- Implemented **Bug2-D star Lite** on **TurtleBot3 in a warehouse environment**.
+- Implemented **Bug-D** on **TurtleBot3 in a warehouse environment**.
 - Navigated from **Point P1 to Point P2** while avoiding **dynamic obstacles**.
 - ![TurtleBot3 Simulation](Images/sim1/1.png)
 
@@ -109,14 +109,14 @@ This project aims to:
 ---
 
 ## 7. Future Improvements
-1. **Integrating Probabilistic Motion Planning (RRT*)** to handle extreme obstacle movements.
+1. **Integrating Probabilistic Motion Planning (RRT)** to handle extreme obstacle movements.
 2. **Enhancing Sensor Fusion** using **Kalman Filtering** or **Dynamic Bayesian Networks**.
 3. **Applying Machine Learning** for real-time **object recognition and classification**.
 
 ---
 
 ## 8. Conclusion
-This project successfully implemented **Bug2-D* Lite with sensor fusion** for **dynamic path planning** in real-world environments. The findings demonstrate **robust adaptability** with potential applications in **industrial automation, search & rescue, and autonomous navigation**.
+This project successfully implemented **Bug-D with sensor fusion** for **dynamic path planning** in real-world environments. The findings demonstrate **robust adaptability** with potential applications in **industrial automation, search & rescue, and autonomous navigation**.
 
 Further research will focus on **improving performance in highly dynamic environments** and **advancing AI-driven decision-making for real-time robotics**.
 
