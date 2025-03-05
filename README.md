@@ -65,13 +65,13 @@ This project aims to:
 ## 4. Dynamic Path Planning
 ### 4.1 Path Planning Algorithms Studied:
 1. **Dijkstra's Algorithm** - Static environment optimization.
-2. **A* Algorithm** - Heuristic-based search for efficient pathfinding.
-3. **D* Algorithm** - Dynamic adaptation with continuous path updates.
-4. **D* Lite Algorithm** - Simplified real-time replanning.
+2. **A star Algorithm** - Heuristic-based search for efficient pathfinding.
+3. **D star Algorithm** - Dynamic adaptation with continuous path updates.
+4. **D star Lite Algorithm** - Simplified real-time replanning.
 5. **Bug2 Algorithm** - Reactive boundary-following approach.
 
 ### 4.2 Bug2-D* Lite: Hybrid Approach
-- **Combines Bug2's reactive avoidance with D* Lite’s real-time replanning**.
+- **Combines Bug2's reactive avoidance with D star Lite’s real-time replanning**.
 - **Prioritizes direct line-of-sight movement** while adapting to dynamic obstacles.
 - **Leverages sensor fusion (LiDAR + Camera) for better environment perception**.
 
@@ -79,7 +79,7 @@ This project aims to:
 
 ## 5. Simulation and Testing
 ### 5.1 Gazebo Simulation
-- Implemented **Bug2-D* Lite** on **TurtleBot3 in a warehouse environment**.
+- Implemented **Bug2-D star Lite** on **TurtleBot3 in a warehouse environment**.
 - Navigated from **Point P1 to Point P2** while avoiding **dynamic obstacles**.
 
 ### 5.2 Performance Evaluation
