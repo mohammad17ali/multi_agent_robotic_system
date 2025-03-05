@@ -12,9 +12,6 @@
 
 ---
 
-## Abstract
-This research explores the application of **Bug2-D* Lite**, a real-time dynamic path planning algorithm, for navigating mobile robots in complex and unpredictable environments. While **LiDAR sensors** are effective in obstacle detection, their limitations are addressed through **sensor fusion**, integrating **LiDAR data** with **camera information**.
-
 Key contributions of this project include:
 - **Camera Calibration** for accurate depth perception and obstacle measurement.
 - **Simulation using Gazebo** to evaluate Bug2-D* Lite before deployment.
