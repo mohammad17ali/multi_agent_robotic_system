@@ -81,6 +81,7 @@ This project aims to:
 ### 5.1 Gazebo Simulation
 - Implemented **Bug2-D star Lite** on **TurtleBot3 in a warehouse environment**.
 - Navigated from **Point P1 to Point P2** while avoiding **dynamic obstacles**.
+- ![TurtleBot3 Simulation](Images/sim1/1.png)
 
 ### 5.2 Performance Evaluation
 - **Path Efficiency:** 1.1 (110% of the optimal path).
